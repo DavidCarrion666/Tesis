@@ -1,0 +1,62 @@
+# --- Global ---
+.DS_Store
+*.log
+*.tmp
+*.swp
+*.sqlite
+*.db
+__pycache__/
+*.py[cod]
+*.ipynb_checkpoints/
+.env
+.env.*
+!.env.example
+
+# --- YOLO / modelos / datasets ---
+*.pt
+*.onnx
+*.tflite
+*.engine
+*.trt
+*.weights
+*.pth
+*.ckpt
+*.npz
+*.npy
+*.bin
+
+# --- Videos / imágenes pesadas ---
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.ts
+*.jpg
+*.jpeg
+*.png
+*.bmp
+
+# --- Carpeta de resultados locales ---
+runs/
+**/runs/
+
+# --- Backend (yolo-api) ---
+yolo-api/venv/
+yolo-api/uploads/
+yolo-api/runs/
+yolo-api/__pycache__/
+yolo-api/*.env
+yolo-api/.env
+
+# --- Frontend (video-rag-ui) ---
+video-rag-ui/node_modules/
+video-rag-ui/.next/
+video-rag-ui/out/
+video-rag-ui/.turbo/
+video-rag-ui/.vercel/
+video-rag-ui/.env
+video-rag-ui/.env.*
+!video-rag-ui/.env.example
+
+# --- Sistemas ---
+Thumbs.db

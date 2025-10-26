@@ -7,35 +7,46 @@ export interface Message {
   content: string;
 }
 
-export default function ChatPanel() {
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
+
+export default function ChatPanel({ videoId }: { videoId: string }) {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim()) return;
 
-    const userMessage: Message = { role: "user", content: input };
-    setMessages((prev) => [...prev, userMessage]);
+    if (!videoId) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: "Primero sube un video (no hay video_id).",
+        },
+      ]);
+      return;
+    }
+
+    // pinta el mensaje del usuario
+    setMessages((prev) => [...prev, { role: "user", content: input }]);
+    const question = input;
     setInput("");
     setLoading(true);
 
     try {
-      const res = await fetch("/api/ask", {
+      const res = await fetch(`${BACKEND_URL}/llm-gemini/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question: input }),
+        body: JSON.stringify({ question, video_id: videoId }),
       });
 
       const data = await res.json();
-      const answer =
-        data.answer || "No se recibió respuesta del modelo Gemini.";
-
-      const response: Message = { role: "assistant", content: answer };
-      setMessages((prev) => [...prev, response]);
-    } catch (error) {
-      console.error(error);
+      const answer = data?.answer ?? "Sin respuesta.";
+      setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
+    } catch (err) {
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: "Error al conectar con el servidor." },
@@ -52,18 +63,18 @@ export default function ChatPanel() {
           Chat de análisis
         </h2>
         <p className="text-sm text-gray-500">
-          Pregunta lo que quieras sobre el video cargado o en vivo.
+          Pregunta usando el video activo. ID: {videoId || "—"}
         </p>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-4 bg-gray-50">
         {messages.map((m, i) => (
-          <MessageBubble key={i} {...m} />
+          <MessageBubble key={i} role={m.role} content={m.content} />
         ))}
 
         {loading && (
           <div className="text-center text-gray-400 italic mt-4 text-sm">
-            Analizando video...
+            Analizando…
           </div>
         )}
       </div>
@@ -75,7 +86,7 @@ export default function ChatPanel() {
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Escribe tu pregunta aquí..."
+          placeholder="Escribe tu pregunta…"
           className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none text-sm text-black"
         />
         <button
