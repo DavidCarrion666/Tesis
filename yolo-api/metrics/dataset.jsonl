@@ -1,0 +1,3 @@
+{"id":"q001","video_id":"V001","lang":"es","eval_type":"numeric","question":"¿Cuántos vehículos hay en total en el video V001?","gold":153}
+{"id":"q002","video_id":"V001","lang":"es","eval_type":"sql","question":"Devuélveme el top 3 de minutos con más vehículos (minuto y conteo).","gold_sql":"SELECT date_trunc('minute', ts) AS m, COUNT(*) AS c FROM detections WHERE video_id = 'V001' GROUP BY 1 ORDER BY c DESC LIMIT 3;"}
+{"id":"q003","video_id":"V001","lang":"es","eval_type":"text","question":"Resume en una línea el patrón de tráfico y cita dos timestamps pico del video V001.","gold_evidence":["V001#t=00:02:15","V001#t=00:05:40"]}

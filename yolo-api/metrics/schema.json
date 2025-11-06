@@ -1,0 +1,13 @@
+{
+  "type": "object",
+  "required": ["answer","type","evidence","confidence"],
+  "properties": {
+    "answer": { "type": "string" },
+    "type": { "enum": ["numeric","text","sql"] },
+    "value": {},
+    "sql_used": { "type": ["string","null"] },
+    "evidence": { "type": "array", "items": { "type": "string" } },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  },
+  "additionalProperties": false
+}
