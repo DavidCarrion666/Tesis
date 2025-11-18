@@ -30,26 +30,36 @@ export default function ChatPanel({ videoId }: { videoId: string }) {
       return;
     }
 
-    // pinta el mensaje del usuario
-    setMessages((prev) => [...prev, { role: "user", content: input }]);
+    // Agregar pregunta del usuario al chat
     const question = input;
+    setMessages((prev) => [...prev, { role: "user", content: question }]);
     setInput("");
     setLoading(true);
 
     try {
-      const res = await fetch(`${BACKEND_URL}/llm-gemini/ask`, {
+      // Llamar al backend actualizado
+      const res = await fetch(`${BACKEND_URL}/llm-text/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ question, video_id: videoId }),
       });
 
       const data = await res.json();
-      const answer = data?.answer ?? "Sin respuesta.";
-      setMessages((prev) => [...prev, { role: "assistant", content: answer }]);
+
+      // Extraemos solo el texto limpio que devuelve el backend
+      const answer = data?.response ?? "Sin respuesta.";
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: answer },
+      ]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        { role: "assistant", content: "Error al conectar con el servidor." },
+        {
+          role: "assistant",
+          content: "Error al conectar con el servidor.",
+        },
       ]);
     } finally {
       setLoading(false);

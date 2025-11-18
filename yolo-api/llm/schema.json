@@ -1,0 +1,15 @@
+{
+  "type": "object",
+  "properties": {
+    "answer": { "type": "string" },
+    "type": { "type": "string", "enum": ["numeric", "sql", "text"] },
+    "value": { "type": ["number", "string", "null"] },
+    "sql_used": { "type": ["string", "null"] },
+    "evidence": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "confidence": { "type": "number" }
+  },
+  "required": ["answer", "type", "value", "sql_used", "evidence", "confidence"]
+}

@@ -37,7 +37,7 @@ def _name_from_h(h: int) -> str:
 
 def vehicle_color_name(frame_bgr, x1, y1, x2, y2):
     """
-    Clasifica color de vehículo combinando LAB (para acromáticos) + HSV (para cromáticos).
+    Clasifica color del vehículo combinando LAB + HSV.
     Devuelve (nombre, (b,g,r)).
     """
     h, w = frame_bgr.shape[:2]
@@ -59,7 +59,6 @@ def vehicle_color_name(frame_bgr, x1, y1, x2, y2):
     Lp = np.percentile(L, 50)
     Cp = np.percentile(chroma, 50)
 
-    # Acromáticos primero
     if Lp < 38 or (Lp < 52 and Cp < 12):
         return "negro", bgr_mean
     if Lp > 86 and Cp < 10:
@@ -72,7 +71,6 @@ def vehicle_color_name(frame_bgr, x1, y1, x2, y2):
         else:
             return "gris claro", bgr_mean
 
-    # Cromáticos por HSV
     hsv = cv2.cvtColor(small, cv2.COLOR_BGR2HSV)
     H = hsv[:, :, 0].astype(np.int32)
     S = hsv[:, :, 1].astype(np.int32)
@@ -92,11 +90,18 @@ def vehicle_color_name(frame_bgr, x1, y1, x2, y2):
     if v_med > 170 and s_med < 160:
         return f"{base} claro", bgr_mean
     return base, bgr_mean
-# =============================================
 
-# ---- Routers LLM (heurístico y Gemini) ----
-from llm_router import router as llm_router            # usa funciones locales sin LLM real
-from llm_gemini_router import router as gemini_router # usa Gemini con function-calling
+
+# ---- Routers LLM existentes ----
+from llm_router import router as llm_router
+from llm_gemini_router import router as gemini_router
+
+# ---- Router moderno (JSON estricto interno) ----
+from llm.router_modern_llm import router as modern_llm_router
+
+# ---- Router de respuesta en texto limpio ----
+from llm.router_text_llm import router as text_llm_router
+
 
 # Crear app FastAPI
 app = FastAPI()
@@ -110,9 +115,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Registro de routers LLM
+# Registro de routers
 app.include_router(llm_router)
 app.include_router(gemini_router)
+app.include_router(modern_llm_router)
+app.include_router(text_llm_router)   # <-- ESTE ES EL NUEVO QUE DEVUELVE TEXTO
+
 
 # Modelo YOLO
 model = YOLO("best.pt")
@@ -120,10 +128,10 @@ model = YOLO("best.pt")
 # Carpeta de subidas
 os.makedirs("uploads", exist_ok=True)
 
+
 # --------------------- SUBIDA DE VIDEO ---------------------
 @app.post("/upload")
 async def upload_video(file: UploadFile = File(...)):
-    """Sube el video y lo guarda en la base de datos"""
     db: Session = SessionLocal()
     try:
         ts = int(time.time())
@@ -147,6 +155,7 @@ async def upload_video(file: UploadFile = File(...)):
     finally:
         db.close()
 
+
 # --------------------- STREAM EN TIEMPO REAL ---------------------
 @app.websocket("/ws/stream")
 async def websocket_stream(
@@ -154,9 +163,6 @@ async def websocket_stream(
     file: Optional[str] = Query(None),
     video_id: Optional[UUID] = Query(None),
 ):
-    """
-    Envía frames con YOLO + tracking y guarda detecciones (incluye track_id y color) en DB.
-    """
     await websocket.accept()
 
     if not file:
@@ -165,7 +171,7 @@ async def websocket_stream(
         return
 
     if video_id is None:
-        video_id = 0  # mantiene compatibilidad con tu versión original
+        video_id = 0
 
     db: Session = SessionLocal()
 
@@ -182,7 +188,6 @@ async def websocket_stream(
             if not ret:
                 break
 
-            # Detección + Tracking (ByteTrack)
             results = model.track(
                 frame,
                 persist=True,
@@ -204,16 +209,14 @@ async def websocket_stream(
                     if hasattr(box, "id") and box.id is not None:
                         try:
                             track_id = int(box.id[0])
-                        except Exception:
+                        except:
                             track_id = None
 
                     class_name = model.names[cls] if hasattr(model, "names") else str(cls)
                     label = f"{class_name} {conf:.2f}"
 
-                    # Color del vehículo
                     color_name, bgr_mean = vehicle_color_name(frame, x1, y1, x2, y2)
 
-                    # Guardar en DB
                     det = Detection(
                         video_id=video_id,
                         frame_number=frame_idx,
@@ -230,9 +233,11 @@ async def websocket_stream(
                     db.add(det)
                     db.commit()
 
-                    # Dibujo
-                    draw_label = f"{label}" + (f" #{track_id}" if track_id is not None else "")
-                    draw_label = f"{draw_label} | {color_name}"
+                    draw_label = f"{label}"
+                    if track_id is not None:
+                        draw_label += f" #{track_id}"
+                    draw_label += f" | {color_name}"
+
                     cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
                     cv2.putText(
                         frame, draw_label, (x1, max(0, y1 - 5)),
@@ -247,7 +252,7 @@ async def websocket_stream(
             jpg_as_text = base64.b64encode(buffer).decode("utf-8")
             try:
                 await websocket.send_text(jpg_as_text)
-            except Exception:
+            except:
                 break
 
             await asyncio.sleep(0.03)
@@ -255,18 +260,18 @@ async def websocket_stream(
         cap.release()
         try:
             await websocket.send_text("<<EOF>>")
-        except Exception:
+        except:
             pass
         try:
             await websocket.close()
-        except Exception:
+        except:
             pass
 
     except Exception as e:
         try:
             await websocket.send_text(f"ERROR: {str(e)}")
             await websocket.close()
-        except Exception:
+        except:
             pass
     finally:
         db.close()

@@ -1,4 +1,4 @@
-# yolo-api/metrics/eval_runner_gemini.py
+# yolo-api/metrics/eval_runner_openai.py
 import os, json, math, time, re, numbers
 from pathlib import Path
 import importlib.util
@@ -7,7 +7,6 @@ import pandas as pd
 from jsonschema import validate, ValidationError
 from sqlalchemy import text
 from dotenv import load_dotenv
-import google.generativeai as genai
 
 # ── Cargar database.py situado en ../database.py ───────────────────────────────
 FILE_DIR = Path(__file__).resolve().parent          # .../yolo-api/metrics
@@ -23,13 +22,14 @@ engine = database.engine
 
 # ====== Configuración base ======
 load_dotenv()
-API_KEY = os.getenv("GOOGLE_API_KEY")
-if not API_KEY:
-    raise RuntimeError("Falta GOOGLE_API_KEY en el entorno")
-genai.configure(api_key=API_KEY)
 
-MODEL = os.getenv("GEMINI_MODEL", "gemini-2.0-flash-lite")
-TEMPERATURE = 0.0  # determinista para respetar formato y SQL
+# OpenAI
+from openai import OpenAI
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+if not OPENAI_API_KEY:
+    raise RuntimeError("Falta OPENAI_API_KEY en el entorno")
+OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
+TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.0"))  # determinista
 
 SCHEMA_PATH = Path(__file__).with_name("schema.json")
 DATASET_PATH = Path(__file__).with_name("dataset.jsonl")
@@ -123,10 +123,9 @@ def _normalize_sql(sql: str, et: str) -> str:
     s = re.sub(r"GROUP\s+BY\s+minute\b", "GROUP BY 1", s, flags=re.I)
     s = re.sub(r"ORDER\s+BY\s+minute\b", "ORDER BY m", s, flags=re.I)
     s = re.sub(r"strftime\(\s*'%M'\s*,\s*ts\s*\)", "to_char(ts,'MI')", s, flags=re.I)
-    # Corrige 'vehicle' a ('car','bus') si aplica
-    if re.search(r"object_class\s*=\s*'vehicle'", s, flags=re.I):
-        if et in ("sql", "text") and not re.search(r"object_class\s*=\s*'car'", s, flags=re.I):
-            s = re.sub(r"object_class\s*=\s*'vehicle'", "object_class IN ('car','bus')", s, flags=re.I)
+    # Tolerancia de clases 'car'/'carro'
+    s = re.sub(r"\bobject_class\s*=\s*'car'\b", "object_class IN ('car','carro')", s, flags=re.I)
+    s = re.sub(r"\bobject_class\s*=\s*'carro'\b", "object_class IN ('car','carro')", s, flags=re.I)
     # Asegura casteo de video_id cuando se compara con literales
     s = re.sub(r"\bvideo_id\s*=\s*'([^']+)'", r"video_id::text = '\1'", s, flags=re.I)
     s = re.sub(r"\bWHERE\s+video_id\s*=\s*", "WHERE video_id::text = ", s, flags=re.I)
@@ -143,10 +142,10 @@ Ejemplos PostgreSQL:
   FROM detections_norm
   WHERE video_id::text = '{video_id}'
   GROUP BY 1 ORDER BY c DESC LIMIT 3;
-- Minuto a minuto solo autos:
+- Minuto a minuto solo 'carro':
   SELECT date_trunc('minute', ts) AS m, COUNT(*) AS c
   FROM detections_norm
-  WHERE video_id::text = '{video_id}' AND object_class='car'
+  WHERE video_id::text = '{video_id}' AND object_class='carro'
   GROUP BY 1 ORDER BY m ASC;
 - TEXT → derivar picos y producir evidencia (usa segundos reales via MAX(ts)):
   WITH per_min AS (
@@ -169,7 +168,7 @@ Eval type: {eval_type}
 Contexto:
 - video_id: {video_id}
 - Tabla detections_norm(video_id, frame_number, ts, object_class, confidence, x1,y1,x2,y2, track_id)
-- Clases válidas: 'car', 'bus'
+- Clases válidas: 'carro', 'bus'
 - Dialecto: PostgreSQL. Usa date_trunc y to_char. No uses strftime.
 - Para text: incluye 'sql_used' como en el ejemplo y construye EXACTAMENTE 2 evidencias {video_id}#t=HH:MM:SS usando los HH:MM:SS devueltos.
 {ejemplos}
@@ -248,13 +247,13 @@ def _minute_bounds(video_id: str):
 def _evidence_score(evidence_list, video_id: str, gold_list):
     """
     Regresa 1 si:
-      a) Cada evidencia tiene formato VIDEO#t=HH:MM:SS,
+      a) Hay EXACTAMENTE 2 evidencias, formato VIDEO#t=HH:MM:SS,
       b) Cada HH:MM está dentro de [mm_min, mm_max] del video,
       c) Existe al menos un registro en ese minuto,
       d) Coincide por minuto con el conjunto gold (al menos 2 si hay 2 gold).
     Si no, 0.
     """
-    if not evidence_list:
+    if not evidence_list or len(evidence_list) != 2:
         return 0
 
     mm_min, mm_max = _minute_bounds(video_id)
@@ -291,28 +290,50 @@ def _evidence_score(evidence_list, video_id: str, gold_list):
     return 1 if len(inter) >= min(2, len(gold_minutes)) else 0
 # ───────────────────────────────────────────────────────────────────────────────
 
-# ====== Llamada a Gemini ======
-def _call_gemini(system: str, user: str, model_name: str = MODEL, temperature: float = TEMPERATURE):
-    m = genai.GenerativeModel(model_name=model_name, system_instruction=system)
+# ====== Llamada a OpenAI ======
+_openai_client = OpenAI(api_key=OPENAI_API_KEY)
+
+# ====== Llamada a OpenAI (Chat Completions) ======
+from openai import OpenAI
+_openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def _call_openai(system: str, user: str, model_name: str = OPENAI_MODEL, temperature: float = TEMPERATURE):
+    """
+    Devuelve (txt_json, latency_ms, in_tokens, out_tokens).
+    Usa Chat Completions con JSON mode para máxima compatibilidad.
+    """
     t0 = time.time()
-    resp = m.generate_content(
-        [user],
-        generation_config={"response_mime_type": "application/json", "temperature": temperature}
+    resp = _openai_client.chat.completions.create(
+        model=model_name,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user",   "content": user},
+        ],
+        temperature=temperature,
+        response_format={"type": "json_object"},
     )
     latency_ms = (time.time() - t0) * 1000.0
-    txt = getattr(resp, "text", None) or ""
-    meta = getattr(resp, "usage_metadata", None)
-    in_tok   = getattr(meta, "prompt_token_count", None) if meta else None
-    out_tok  = getattr(meta, "candidates_token_count", None) if meta else None
-    total_tok= getattr(meta, "total_token_count", None) if meta else None
+
+    txt = (resp.choices[0].message.content or "").strip()
+    usage = getattr(resp, "usage", None)
+    in_tok  = getattr(usage, "prompt_tokens", None)      if usage else None
+    out_tok = getattr(usage, "completion_tokens", None)  if usage else None
     return txt, latency_ms, in_tok, out_tok
+
 
 # ====== Runner principal ======
 def run_eval(dataset_path: Path = DATASET_PATH):
     if not dataset_path.exists():
         raise FileNotFoundError(f"No existe el dataset: {dataset_path}")
 
-    items = [json.loads(l) for l in dataset_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    lines = [l for l in dataset_path.read_text(encoding="utf-8").splitlines() if l.strip()]
+    items = []
+    for l in lines:
+        try:
+            items.append(json.loads(l))
+        except json.JSONDecodeError as e:
+            raise RuntimeError(f"Línea JSONL inválida: {l[:120]}... -> {e}")
+
     rows_out = []
 
     for it in items:
@@ -340,7 +361,7 @@ def run_eval(dataset_path: Path = DATASET_PATH):
             if hint:
                 user += "\n" + hint
 
-        raw, latency_ms, in_tok, out_tok = _call_gemini(SYSTEM_ES, user, MODEL, TEMPERATURE)
+        raw, latency_ms, in_tok, out_tok = _call_openai(SYSTEM_ES, user, OPENAI_MODEL, TEMPERATURE)
 
         parsed = None; json_valid = 0; err = ""
         try:
@@ -438,7 +459,7 @@ def run_eval(dataset_path: Path = DATASET_PATH):
                         bertscore_f1 = None
 
         rows_out.append({
-            "id": it["id"], "provider": "gemini", "model": MODEL, "lang": it.get("lang","es"),
+            "id": it["id"], "provider": "openai", "model": OPENAI_MODEL, "lang": it.get("lang","es"),
             "latency_ms": latency_ms, "in_tokens": in_tok, "out_tokens": out_tok,
             "json_ok": json_valid, "numeric_acc": numeric_acc, "numeric_mae": numeric_mae,
             "sql_ok": sql_ok, "grounded": grounded, "hallucination": halluc,
@@ -462,8 +483,8 @@ def run_eval(dataset_path: Path = DATASET_PATH):
     out_dir = out_base / "runs"
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    detail_path = out_dir / "per_question.csv"
-    summary_path = out_dir / "summary.csv"
+    detail_path = out_dir / "per_question_openai.csv"
+    summary_path = out_dir / "summary_openai.csv"
     df.to_csv(detail_path, index=False, encoding="utf-8")
 
     def _safe_mean(series):
