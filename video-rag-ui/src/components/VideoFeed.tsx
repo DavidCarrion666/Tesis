@@ -33,7 +33,8 @@ export default function VideoFeed({ onVideoIdChange }: VideoFeedProps) {
       }
 
       // Inicia el streaming
-      startStream(data.filename.replace(/\\/g, "/"), data.video_id);
+      startStream(data.path.replace(/\\/g, "/"), data.video_id);
+
     } catch (err) {
       alert("Error subiendo el video.");
       console.error(err);

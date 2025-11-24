@@ -1,0 +1,48 @@
+{"id":"q01","question":"¿Cuántos vehículos aparecen en total en el video?","answer_true":13,"type":"numeric"}
+{"id":"q02","question":"¿Cuántos vehículos únicos hay?","answer_true":13,"type":"numeric"}
+{"id":"q03","question":"¿Cuántos vehículos aparecen al mismo tiempo en el momento de mayor tráfico?","answer_true":7,"type":"numeric"}
+{"id":"q04","question":"¿Cuántos vehículos aparecen solo por un instante?","answer_true":0,"type":"numeric"}
+{"id":"q05","question":"¿Cuántos vehículos permanecen visibles más de la mitad del video?","answer_true":3,"type":"numeric"}
+{"id":"q06","question":"¿Cuántos vehículos aparecen únicamente al inicio?","answer_true":"5-6","type":"range"}
+{"id":"q07","question":"¿Cuántos vehículos aparecen únicamente al final?","answer_true":7,"type":"numeric"}
+{"id":"q08","question":"¿Cuántos vehículos se cruzan entre sí visualmente?","answer_true":0,"type":"numeric"}
+{"id":"q09","question":"¿Cuántos vehículos aparecen parcialmente?","answer_true":0,"type":"numeric"}
+{"id":"q10","question":"¿Cuántos vehículos desaparecen y vuelven a aparecer?","answer_true":0,"type":"numeric"}
+
+{"id":"q11","question":"¿Cuántos vehículos negros aparecen?","answer_true":"2-3","type":"range"}
+{"id":"q12","question":"¿Cuántos vehículos blancos aparecen?","answer_true":6,"type":"numeric"}
+{"id":"q13","question":"¿Cuántos vehículos grises aparecen?","answer_true":1,"type":"numeric"}
+{"id":"q14","question":"¿Cuántos vehículos de color rojo aparecen?","answer_true":1,"type":"numeric"}
+{"id":"q15","question":"¿Cuántos colores diferentes aparecen en total?","answer_true":"4-6","type":"range"}
+
+{"id":"q30","question":"¿Cuántos vehículos aparecen en los primeros 10 segundos?","answer_true":10,"type":"numeric"}
+{"id":"q31","question":"¿Cuántos vehículos aparecen entre los 10 y 20 segundos?","answer_true":10,"type":"numeric"}
+{"id":"q32","question":"¿Cuántos vehículos aparecen después de los 20 segundos?","answer_true":0,"type":"numeric"}
+
+{"id":"q16","question":"¿Cuál es el color dominante entre los vehículos del video?","answer_true":"Predominan tonos blancos y grises","type":"text"}
+{"id":"q17","question":"¿Cuál es el color del vehículo que aparece primero?","answer_true":"negro o blanco","type":"text"}
+{"id":"q18","question":"¿Cuál es el color del vehículo que aparece al final?","answer_true":"amarillo","type":"text"}
+
+{"id":"q19","question":"¿En qué dirección general se mueven los vehículos?","answer_true":"horizontal","type":"text"}
+{"id":"q20","question":"¿En qué sentido se mueven los vehículos?","answer_true":"izquierda a derecha","type":"text"}
+{"id":"q21","question":"¿Algún vehículo cambia de dirección durante el video?","answer_true":"no","type":"text"}
+{"id":"q22","question":"¿Algún vehículo se detiene visiblemente?","answer_true":"sí, tres están estacionados","type":"text"}
+{"id":"q23","question":"¿Cuál vehículo recorre la mayor distancia?","answer_true":"casi todos recorren la misma distancia","type":"text"}
+{"id":"q24","question":"¿Cuál vehículo recorre la menor distancia?","answer_true":"los estacionados","type":"text"}
+{"id":"q25","question":"¿Existe algún vehículo que entra y sale muy rápido del cuadro?","answer_true":"no","type":"text"}
+{"id":"q26","question":"¿Hay vehículos que circulan muy cerca entre sí?","answer_true":"sí","type":"text"}
+{"id":"q27","question":"¿Algún vehículo fuera del flujo normal?","answer_true":"no","type":"text"}
+{"id":"q28","question":"¿Algún vehículo realiza un giro perceptible?","answer_true":"no","type":"text"}
+
+{"id":"q29","question":"¿Cuál segmento del video tiene más vehículos (inicio, medio, final)?","answer_true":"medio","type":"text"}
+{"id":"q33","question":"¿El tráfico aumenta o disminuye hacia el final del video?","answer_true":"disminuye","type":"text"}
+{"id":"q34","question":"¿Hay algún intervalo sin vehículos?","answer_true":"no","type":"text"}
+{"id":"q36","question":"¿Cuál es el intervalo más congestionado?","answer_true":"medio","type":"text"}
+
+{"id":"q37","question":"¿Ocurre alguna colisión en el video?","answer_true":"no","type":"text"}
+{"id":"q38","question":"¿En qué segundo ocurre la colisión?","answer_true":"no hay colisión","type":"text"}
+{"id":"q39","question":"¿Qué vehículos están involucrados en la colisión?","answer_true":"ninguno","type":"text"}
+{"id":"q40","question":"¿Ocurre algún frenado brusco?","answer_true":"no","type":"text"}
+{"id":"q41","question":"¿Ocurre algún adelantamiento?","answer_true":"sí","type":"text"}
+{"id":"q42","question":"¿Algún vehículo invade un carril indebido?","answer_true":"no","type":"text"}
+{"id":"q43","question":"¿Algún vehículo realiza un movimiento inesperado?","answer_true":"no","type":"text"}

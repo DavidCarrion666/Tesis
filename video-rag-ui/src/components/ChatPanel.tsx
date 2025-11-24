@@ -30,36 +30,38 @@ export default function ChatPanel({ videoId }: { videoId: string }) {
       return;
     }
 
-    // Agregar pregunta del usuario al chat
     const question = input;
     setMessages((prev) => [...prev, { role: "user", content: question }]);
     setInput("");
     setLoading(true);
 
     try {
-      // Llamar al backend actualizado
-      const res = await fetch(`${BACKEND_URL}/llm-text/query`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ question, video_id: videoId }),
-      });
+      const res = await fetch(`${BACKEND_URL}/multimodal/video-query`, {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    video_id: videoId,
+    question: question,
+    step: 30, // frames representativos
+  }),
+});
+;
+const data = await res.json();
 
-      const data = await res.json();
+const answer =
+  data?.llm_response?.answer ??
+  JSON.stringify(data.llm_response, null, 2) ??
+  "Sin respuesta.";
 
-      // Extraemos solo el texto limpio que devuelve el backend
-      const answer = data?.response ?? "Sin respuesta.";
+setMessages((prev) => [
+  ...prev,
+  { role: "assistant", content: answer },
+]);
 
-      setMessages((prev) => [
-        ...prev,
-        { role: "assistant", content: answer },
-      ]);
     } catch (err) {
       setMessages((prev) => [
         ...prev,
-        {
-          role: "assistant",
-          content: "Error al conectar con el servidor.",
-        },
+        { role: "assistant", content: "Error al conectar con el servidor." },
       ]);
     } finally {
       setLoading(false);
@@ -81,7 +83,6 @@ export default function ChatPanel({ videoId }: { videoId: string }) {
         {messages.map((m, i) => (
           <MessageBubble key={i} role={m.role} content={m.content} />
         ))}
-
         {loading && (
           <div className="text-center text-gray-400 italic mt-4 text-sm">
             Analizando…
@@ -99,6 +100,7 @@ export default function ChatPanel({ videoId }: { videoId: string }) {
           placeholder="Escribe tu pregunta…"
           className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#1E3A8A] focus:outline-none text-sm text-black"
         />
+
         <button
           disabled={loading}
           type="submit"
