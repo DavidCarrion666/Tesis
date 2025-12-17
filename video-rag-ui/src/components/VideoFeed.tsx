@@ -12,36 +12,46 @@ export default function VideoFeed({ onVideoIdChange }: VideoFeedProps) {
   const [loading, setLoading] = useState(false);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    setLoading(true);
-    const formData = new FormData();
-    formData.append("file", file);
+  setLoading(true);
+  const formData = new FormData();
+  formData.append("file", file);
 
-    try {
-      const res = await fetch("http://127.0.0.1:8000/upload", {
-        method: "POST",
-        body: formData,
-      });
-      const data = await res.json();
-      console.log("Archivo subido:", data);
+  try {
+    const res = await fetch("http://127.0.0.1:8000/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json();
+    console.log("Archivo subido:", data);
 
-      // 🔹 Notifica al padre el video_id
-      if (data?.video_id) {
-        onVideoIdChange?.(data.video_id);
-      }
-
-      // Inicia el streaming
-      startStream(data.path.replace(/\\/g, "/"), data.video_id);
-
-    } catch (err) {
-      alert("Error subiendo el video.");
-      console.error(err);
-    } finally {
-      setLoading(false);
+    // 🔹 Notifica al padre el video_id
+    if (data?.video_id) {
+      onVideoIdChange?.(data.video_id);
     }
-  };
+
+    // 👇 Aquí está el cambio importante
+    const rawPath = data.path ?? data.filename; // usa path si existe, si no filename
+    if (!rawPath) {
+      alert("El backend no devolvió 'path' ni 'filename'");
+      return;
+    }
+
+    const normalizedPath = rawPath.replace(/\\/g, "/");
+
+    // Inicia el streaming
+    startStream(normalizedPath, data.video_id);
+
+  } catch (err) {
+    alert("Error subiendo el video.");
+    console.error(err);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   const startStream = (filePath: string, videoId: string) => {
     const socket = new WebSocket(

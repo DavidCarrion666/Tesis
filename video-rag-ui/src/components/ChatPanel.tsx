@@ -37,28 +37,43 @@ export default function ChatPanel({ videoId }: { videoId: string }) {
 
     try {
       const res = await fetch(`${BACKEND_URL}/multimodal/video-query`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({
-    video_id: videoId,
-    question: question,
-    step: 30, // frames representativos
-  }),
-});
-;
-const data = await res.json();
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          video_id: videoId,
+          question: question,
+          step: 30, // frames representativos
+        }),
+      });
 
-const answer =
-  data?.llm_response?.answer ??
-  JSON.stringify(data.llm_response, null, 2) ??
-  "Sin respuesta.";
+      const data = await res.json();
+      console.log("Respuesta backend /multimodal/video-query:", data);
 
-setMessages((prev) => [
-  ...prev,
-  { role: "assistant", content: answer },
-]);
+      let answer: string;
 
+      if (data.error) {
+        // error a nivel de endpoint FastAPI
+        answer = `Error en el servidor: ${data.error}`;
+      } else if (data.llm_response?.error) {
+        // error dentro de call_multimodal_video_llm
+        answer = `Error al llamar al LLM: ${data.llm_response.error}`;
+      } else if (data.llm_response?.answer) {
+        // caso normal: el modelo devolvió un campo answer
+        answer = data.llm_response.answer;
+      } else if (data.llm_response) {
+        // hay algo en llm_response, pero sin "answer"
+        answer = JSON.stringify(data.llm_response, null, 2);
+      } else {
+        // nada de nada
+        answer = "Sin respuesta del modelo (llm_response vacío).";
+      }
+
+      setMessages((prev) => [
+        ...prev,
+        { role: "assistant", content: answer },
+      ]);
     } catch (err) {
+      console.error("Error en fetch /multimodal/video-query:", err);
       setMessages((prev) => [
         ...prev,
         { role: "assistant", content: "Error al conectar con el servidor." },

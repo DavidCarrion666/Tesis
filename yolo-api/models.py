@@ -16,6 +16,8 @@ class Video(Base):
     created_at = Column(TIMESTAMP, default=datetime.utcnow)
 
     detections = relationship("Detection", back_populates="video")
+    # 🔹 relación opcional con documentos RAG
+    documents = relationship("VideoDocument", back_populates="video")
 
 
 class Detection(Base):
@@ -35,3 +37,22 @@ class Detection(Base):
     extra = Column(JSONB, default={})
 
     video = relationship("Video", back_populates="detections")
+
+class VideoDocument(Base):
+    __tablename__ = "video_documents"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
+    video_id = Column(UUID(as_uuid=True), ForeignKey("videos.id"), index=True)
+
+    source_id = Column(String, index=True)   # ej: "veh_12", "min_3"
+    doc_type = Column(String, index=True)    # ej: "vehicle", "minute", "global"
+    text = Column(String, nullable=False)    # texto RAG
+
+    # 👇 CAMBIO IMPORTANTE:
+    # atributo Python: doc_metadata
+    # nombre de columna en BD: "metadata"
+    doc_metadata = Column("metadata", JSONB, default=dict)
+
+    embedding = Column(JSONB, nullable=False)  # lista de floats
+
+    video = relationship("Video", back_populates="documents")
